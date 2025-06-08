@@ -92,7 +92,7 @@ export default function Home() {
     setTranslatedTranscript("");
     setChat([]);
     try {
-      const res = await fetch("/api/transcript", {
+      const res = await fetch("https://python-script-3.onrender.com/get-transcript/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: youtubeUrl, language }),
