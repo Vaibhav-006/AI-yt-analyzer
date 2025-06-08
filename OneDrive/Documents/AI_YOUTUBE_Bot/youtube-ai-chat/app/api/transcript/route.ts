@@ -1,48 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
 
 export async function POST(req: NextRequest) {
   try {
-    const { url, language = 'en' } = await req.json();
-    if (!url) {
-      return NextResponse.json({ error: 'No URL provided' }, { status: 400 });
+    // Validate request body
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
     }
 
-    return await new Promise<Response>((resolve) => {
-      const pythonScript = path.join(process.cwd(), 'scripts', 'get_transcript.py');
-      const pythonProcess = spawn('python', [pythonScript, url, language]);
+    const { url, language = 'en' } = body;
 
-      let result = '';
-      let error = '';
+    // Validate URL
+    if (!url) {
+      return NextResponse.json(
+        { error: 'No URL provided' },
+        { status: 400 }
+      );
+    }
 
-      pythonProcess.stdout.on('data', (data) => {
-        result += data.toString();
-      });
+    try {
+      new URL(url); // Validate URL format
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid URL format' },
+        { status: 400 }
+      );
+    }
 
-      pythonProcess.stderr.on('data', (data) => {
-        error += data.toString();
-      });
+    // Validate language
+    if (typeof language !== 'string' || language.length !== 2) {
+      return NextResponse.json(
+        { error: 'Invalid language code. Must be a 2-letter ISO code' },
+        { status: 400 }
+      );
+    }
 
-      pythonProcess.on('close', (code) => {
-        if (code !== 0) {
-          resolve(NextResponse.json({ error: error || 'Failed to fetch transcript' }, { status: 500 }));
-          return;
-        }
-
-        try {
-          const data = JSON.parse(result);
-          if (data.error) {
-            resolve(NextResponse.json({ error: data.error }, { status: 400 }));
-            return;
-          }
-          resolve(NextResponse.json(data));
-        } catch (e) {
-          resolve(NextResponse.json({ error: 'Failed to parse transcript data' }, { status: 500 }));
-        }
-      });
+    // Call the Python API
+    const response = await fetch('https://python-script-3.onrender.com/get-transcript/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, language }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { 
+          error: 'Failed to fetch transcript',
+          details: errorData.error || `HTTP error ${response.status}`
+        },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to fetch transcript' }, { status: 500 });
+    console.error('Transcript API error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
+      { status: 500 }
+    );
   }
 } 
