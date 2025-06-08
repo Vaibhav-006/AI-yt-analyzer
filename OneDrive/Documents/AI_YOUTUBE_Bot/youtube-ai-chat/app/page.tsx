@@ -69,7 +69,7 @@ export default function Home() {
       formData.append('file', selectedFile);
       formData.append('language', language);
 
-      const res = await fetch("/api/pdf", {
+      const res = await fetch("https://python-script-3.onrender.com/process_pdf/", {
         method: "POST",
         body: formData,
       });
